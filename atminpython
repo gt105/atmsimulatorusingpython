@@ -1,12 +1,34 @@
 
 import json
+from typing import Dict, List, Optional
+from datetime import datetime
+
+
+=======
+
+import json
 from typing import Dict, List
 from datetime import datetime
+
 
 ATM_FILE = "atm_data.json"
 TRANSACTIONS_FILE = "transactions.json"
 
 
+
+class ATM:
+    def __init__(self, atm_file: str = ATM_FILE, tx_file: str = TRANSACTIONS_FILE) -> None:
+        self.atm_file = atm_file
+        self.tx_file = tx_file
+
+        self.data: Dict[str, str | float] = self._load_data(self.atm_file)
+        self.balance: float = float(self.data.get("balance", 10000.0))
+        self.pin: str = str(self.data.get("pin", "1234"))
+
+    def _load_data(self, filename: str) -> Dict:
+        try:
+            with open(filename, "r") as f:
+=======
 class ATM:
     def __init__(self, atm_file: str = ATM_FILE, tx_file: str = TRANSACTIONS_FILE) -> None:
         self.atm_file = atm_file
@@ -52,10 +74,18 @@ class ATM:
         """Load ATM data from JSON file."""
         try:
             with open(self.data_file, "r") as f:
+
                 return json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             return {}
 
+
+    def _save_data(self, fusene:
+        with open(filename, "w") as f:
+            json.dump(data, f, indent=4)
+
+    def _verify_pin(self) -> bool:
+=======
     def _save_data(self) -> None:
         """Save ATM data to JSON file."""
         self.data["balance"] = self.balance
@@ -76,12 +106,28 @@ class ATM:
     def _verify_pin(self) -> bool:
         """Private method to verify user PIN."""
 
+
         entered_pin = input("Enter your PIN: ").strip()
         if entered_pin == self.pin:
             return True
         print("Incorrect PIN!")
         return False
 
+
+    def _record_transaction(self, tx_type: str, amount: float) -> None:
+        transactions: List[Dict] = self._load_data(self.tx_file).get("transactions", [])
+        transactions.append({
+            "type": tx_type,
+            "amount": amount,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "balance_after": self.balance
+        })
+        self._save_data(self.tx_file, {"transactions": transactions})
+
+    def check_balance(self) -> None:
+        print(f"Your current balance is: {self.balance:.2f} INR")
+
+=======
 
     def _record_transaction(self, tx_type: str, amount: float) -> None:
         """Record a deposit or withdrawal with timestamp."""
@@ -96,6 +142,7 @@ class ATM:
 
     def check_balance(self) -> None:
         print(f"Your current balance is: {self.balance:.2f} INR")
+
 
     def deposit(self) -> None:
         try:
@@ -121,6 +168,8 @@ class ATM:
                 self.balance -= amount
                 self._save_data(self.atm_file, {"balance": self.balance, "pin": self.pin})
                 self._record_transaction("Withdrawal", amount)
+
+=======
 =======
 
 
@@ -174,6 +223,7 @@ class ATM:
                 self.balance -= amount
 
 
+
                 print(f"Withdrawn {amount:.2f} INR successfully.")
         except ValueError:
             print("Invalid input! Please enter a numeric value.")
@@ -186,6 +236,9 @@ class ATM:
 
 =======
 
+=======
+
+
 
         new_pin = input("Enter new PIN: ").strip()
         confirm_pin = input("Confirm new PIN: ").strip()
@@ -195,8 +248,12 @@ class ATM:
             self._save_data(self.atm_file, {"balance": self.balance, "pin": self.pin})
 =======
 
+            self._save_data(self.atm_file, {"balance": self.balance, "pin": self.pin})
+=======
+
             self._save_data()
 =======
+
 
 
             print("PIN changed successfully!")
@@ -204,22 +261,59 @@ class ATM:
             print("PIN confirmation does not match!")
 
 
+    def view_transactions(self, tx_type: Optional[str] = None,
+                          start_date: Optional[str] = None,
+                          end_date: Optional[str] = None) -> None:
+=======
+
     def view_transactions(self) -> None:
+
         data = self._load_data(self.tx_file)
         transactions: List[Dict] = data.get("transactions", [])
         if not transactions:
             print("\nNo transactions found.")
             return
+
+
+        filtered = transactions
+        if tx_type:
+            filtered = [tx for tx in filtered if tx["type"].lower() == tx_type.lower()]
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                filtered = [tx for tx in filtered if datetime.strptime(tx["timestamp"], "%Y-%m-%d %H:%M:%S") >= start_dt]
+            except ValueError:
+                print("Invalid start date format! Use YYYY-MM-DD")
+                return
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+                filtered = [tx for tx in filtered if datetime.strptime(tx["timestamp"], "%Y-%m-%d %H:%M:%S") <= end_dt]
+            except ValueError:
+                print("Invalid end date format! Use YYYY-MM-DD")
+                return
+
+        if not filtered:
+            print("\nNo transactions found for the given filters.")
+            return
+
+        print("\n=== Filtered Transaction History ===")
+        for idx, tx in enumerate(filtered, start=1):
+=======
         print("\n=== Transaction History ===")
         for idx, tx in enumerate(transactions, start=1):
+
             print(f"{idx}. {tx['timestamp']} | {tx['type']} | Amount: {tx['amount']:.2f} INR | Balance After: {tx['balance_after']:.2f} INR")
 
 
 def main() -> None:
     atm = ATM()
+
+=======
 =======
 
 def main() -> None:
+
 
 
 
@@ -229,6 +323,20 @@ def main() -> None:
         "3": lambda: atm.withdraw() if atm._verify_pin() else None,
         "4": atm.change_pin,
 
+        "5": lambda: atm.view_transactions_prompt() if atm._verify_pin() else None,
+        "6": lambda: print("Thank you for using the ATM. Goodbye!")
+    }
+
+    def view_transactions_prompt() -> None:
+        print("\nFilter Transaction History (press enter to skip a filter):")
+        tx_type = input("Type (Deposit/Withdrawal): ").strip() or None
+        start_date = input("Start Date (YYYY-MM-DD): ").strip() or None
+        end_date = input("End Date (YYYY-MM-DD): ").strip() or None
+        atm.view_transactions(tx_type, start_date, end_date)
+
+    atm.view_transactions_prompt = view_transactions_prompt
+=======
+
         "5": lambda: atm.view_transactions() if atm._verify_pin() else None,
         "6": lambda: print("Thank you for using the ATM. Goodbye!")
 =======
@@ -236,27 +344,12 @@ def main() -> None:
 
     }
 
+
     while True:
         print("\n=== ATM Menu ===")
         print("1. Check Balance")
         print("2. Deposit Money")
         print("3. Withdraw Money")
-        print("4. Change PIN")
-
-        print("5. View Transaction History")
-        print("6. Exit")
-=======
-        print("5. Exit")
-
-
-        choice = input("Enter your choice: ").strip()
-        action = menu_options.get(choice)
-        if action:
-            action()
-
-            if choice == "6":
-=======
-            if choice == "5":
 
                 break
         else:
