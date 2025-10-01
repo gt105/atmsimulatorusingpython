@@ -1,5 +1,38 @@
 
 import json
+from typing import Dict, List
+from datetime import datetime
+
+ATM_FILE = "atm_data.json"
+TRANSACTIONS_FILE = "transactions.json"
+
+
+class ATM:
+    def __init__(self, atm_file: str = ATM_FILE, tx_file: str = TRANSACTIONS_FILE) -> None:
+        self.atm_file = atm_file
+        self.tx_file = tx_file
+
+        self.data: Dict[str, str | float] = self._load_data(self.atm_file)
+        self.balance: float = float(self.data.get("balance", 10000.0))
+        self.pin: str = str(self.data.get("pin", "1234"))
+
+    def _load_data(self, filename: str) -> Dict:
+        """Load data from a JSON file."""
+        try:
+            with open(filename, "r") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def _save_data(self, filename: str, data: Dict) -> None:
+        """Save data to a JSON file."""
+        with open(filename, "w") as f:
+            json.dump(data, f, indent=4)
+
+    def _verify_pin(self) -> bool:
+=======
+
+import json
 from typing import Dict
 
 
@@ -42,11 +75,53 @@ class ATM:
 
     def _verify_pin(self) -> bool:
         """Private method to verify user PIN."""
+
         entered_pin = input("Enter your PIN: ").strip()
         if entered_pin == self.pin:
             return True
         print("Incorrect PIN!")
         return False
+
+
+    def _record_transaction(self, tx_type: str, amount: float) -> None:
+        """Record a deposit or withdrawal with timestamp."""
+        transactions: List[Dict] = self._load_data(self.tx_file).get("transactions", [])
+        transactions.append({
+            "type": tx_type,
+            "amount": amount,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "balance_after": self.balance
+        })
+        self._save_data(self.tx_file, {"transactions": transactions})
+
+    def check_balance(self) -> None:
+        print(f"Your current balance is: {self.balance:.2f} INR")
+
+    def deposit(self) -> None:
+        try:
+            amount = float(input("Enter amount to deposit: ").strip())
+            if amount <= 0:
+                print("Amount must be greater than zero!")
+                return
+            self.balance += amount
+            self._save_data(self.atm_file, {"balance": self.balance, "pin": self.pin})
+            self._record_transaction("Deposit", amount)
+            print(f"Deposited {amount:.2f} INR successfully.")
+        except ValueError:
+            print("Invalid input! Please enter a numeric value.")
+
+    def withdraw(self) -> None:
+        try:
+            amount = float(input("Enter amount to withdraw: ").strip())
+            if amount <= 0:
+                print("Amount must be greater than zero!")
+            elif amount > self.balance:
+                print("Insufficient balance!")
+            else:
+                self.balance -= amount
+                self._save_data(self.atm_file, {"balance": self.balance, "pin": self.pin})
+                self._record_transaction("Withdrawal", amount)
+=======
 
 
     def check_balance(self) -> None:
@@ -98,6 +173,7 @@ class ATM:
             else:
                 self.balance -= amount
 
+
                 print(f"Withdrawn {amount:.2f} INR successfully.")
         except ValueError:
             print("Invalid input! Please enter a numeric value.")
@@ -108,20 +184,43 @@ class ATM:
             print("Incorrect current PIN!")
             return
 
+=======
+
+
         new_pin = input("Enter new PIN: ").strip()
         confirm_pin = input("Confirm new PIN: ").strip()
         if new_pin == confirm_pin:
             self.pin = new_pin
 
+            self._save_data(self.atm_file, {"balance": self.balance, "pin": self.pin})
+=======
+
             self._save_data()
 =======
+
 
             print("PIN changed successfully!")
         else:
             print("PIN confirmation does not match!")
 
 
+    def view_transactions(self) -> None:
+        data = self._load_data(self.tx_file)
+        transactions: List[Dict] = data.get("transactions", [])
+        if not transactions:
+            print("\nNo transactions found.")
+            return
+        print("\n=== Transaction History ===")
+        for idx, tx in enumerate(transactions, start=1):
+            print(f"{idx}. {tx['timestamp']} | {tx['type']} | Amount: {tx['amount']:.2f} INR | Balance After: {tx['balance_after']:.2f} INR")
+
+
 def main() -> None:
+    atm = ATM()
+=======
+
+def main() -> None:
+
 
 
     menu_options = {
@@ -129,7 +228,12 @@ def main() -> None:
         "2": lambda: atm.deposit() if atm._verify_pin() else None,
         "3": lambda: atm.withdraw() if atm._verify_pin() else None,
         "4": atm.change_pin,
-        "5": lambda: print("Thank you for using the ATM. Goodbye!")
+
+        "5": lambda: atm.view_transactions() if atm._verify_pin() else None,
+        "6": lambda: print("Thank you for using the ATM. Goodbye!")
+=======
+        "5": lambda: print("Thank you for using the ATM. Goodby
+
     }
 
     while True:
@@ -138,13 +242,22 @@ def main() -> None:
         print("2. Deposit Money")
         print("3. Withdraw Money")
         print("4. Change PIN")
+
+        print("5. View Transaction History")
+        print("6. Exit")
+=======
         print("5. Exit")
+
 
         choice = input("Enter your choice: ").strip()
         action = menu_options.get(choice)
         if action:
             action()
+
+            if choice == "6":
+=======
             if choice == "5":
+
                 break
         else:
             print("Invalid choice! Please try again.")
