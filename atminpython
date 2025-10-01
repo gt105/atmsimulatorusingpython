@@ -1,77 +1,169 @@
-class ATM:
-    def __init__(self, balance=0):
-        self.balance = balance
-        self.pin = "1234"
+import json
+from typing import Dict, List, Optional
+from datetime import datetime
 
-    def check_pin(self):
-        entered_pin = input("Enter your PIN: ")
+
+ATM_FILE = "atm_data.json"
+TRANSACTIONS_FILE = "transactions.json"
+
+
+class ATM:
+    def __init__(self, atm_file: str = ATM_FILE, tx_file: str = TRANSACTIONS_FILE) -> None:
+        self.atm_file = atm_file
+        self.tx_file = tx_file
+
+        self.data: Dict[str, str | float] = self._load_data(self.atm_file)
+        self.balance: float = float(self.data.get("balance", 10000.0))
+        self.pin: str = str(self.data.get("pin", "1234"))
+
+    def _load_data(self, filename: str) -> Dict:
+        try:
+            with open(filename, "r") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def _save_data(self, filename: str, data: Dict) -> None:
+        with open(filename, "w") as f:
+            json.dump(data, f, indent=4)
+
+    def _verify_pin(self) -> bool:
+        entered_pin = input("Enter your PIN: ").strip()
         if entered_pin == self.pin:
             return True
-        else:
-            print("Incorrect PIN!")
-            return False
+        print("Incorrect PIN!")
+        return False
 
-    def check_balance(self):
-        print(f"Your current balance is: {self.balance} INR")
+    def _record_transaction(self, tx_type: str, amount: float) -> None:
+        transactions: List[Dict] = self._load_data(self.tx_file).get("transactions", [])
+        transactions.append({
+            "type": tx_type,
+            "amount": amount,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "balance_after": self.balance
+        })
+        self._save_data(self.tx_file, {"transactions": transactions})
 
-    def deposit(self):
-        amount = float(input("Enter amount to deposit: "))
-        if amount > 0:
+    def check_balance(self) -> None:
+        print(f"Your current balance is: {self.balance:.2f} INR")
+
+    def deposit(self) -> None:
+        try:
+            amount = float(input("Enter amount to deposit: ").strip())
+            if amount <= 0:
+                print("Amount must be greater than zero!")
+                return
             self.balance += amount
-            print(f"Deposited {amount} INR successfully.")
-        else:
-            print("Invalid amount!")
+            self._save_data(self.atm_file, {"balance": self.balance, "pin": self.pin})
+            self._record_transaction("Deposit", amount)
+            print(f"Deposited {amount:.2f} INR successfully.")
+        except ValueError:
+            print("Invalid input! Please enter a numeric value.")
 
-    def withdraw(self):
-        amount = float(input("Enter amount to withdraw: "))
-        if amount <= 0:
-            print("Invalid amount!")
-        elif amount > self.balance:
-            print("Insufficient balance!")
-        else:
-            self.balance -= amount
-            print(f"Withdrawn {amount} INR successfully.")
-
-    def change_pin(self):
-        old_pin = input("Enter current PIN: ")
-        if old_pin == self.pin:
-            new_pin = input("Enter new PIN: ")
-            confirm_pin = input("Confirm new PIN: ")
-            if new_pin == confirm_pin:
-                self.pin = new_pin
-                print("PIN changed successfully!")
+    def withdraw(self) -> None:
+        try:
+            amount = float(input("Enter amount to withdraw: ").strip())
+            if amount <= 0:
+                print("Amount must be greater than zero!")
+            elif amount > self.balance:
+                print("Insufficient balance!")
             else:
-                print("PIN confirmation does not match!")
-        else:
-            print("Incorrect current PIN!")
+                self.balance -= amount
+                self._save_data(self.atm_file, {"balance": self.balance, "pin": self.pin})
+                self._record_transaction("Withdrawal", amount)
+                print(f"Withdrawn {amount:.2f} INR successfully.")
+        except ValueError:
+            print("Invalid input! Please enter a numeric value.")
 
-def main():
-    atm = ATM(balance=10000)
+    def change_pin(self) -> None:
+        old_pin = input("Enter current PIN: ").strip()
+        if old_pin != self.pin:
+            print("Incorrect current PIN!")
+            return
+        new_pin = input("Enter new PIN: ").strip()
+        confirm_pin = input("Confirm new PIN: ").strip()
+        if new_pin == confirm_pin:
+            self.pin = new_pin
+            self._save_data(self.atm_file, {"balance": self.balance, "pin": self.pin})
+            print("PIN changed successfully!")
+        else:
+            print("PIN confirmation does not match!")
+
+    def view_transactions(self, tx_type: Optional[str] = None,
+                          start_date: Optional[str] = None,
+                          end_date: Optional[str] = None) -> None:
+        data = self._load_data(self.tx_file)
+        transactions: List[Dict] = data.get("transactions", [])
+        if not transactions:
+            print("\nNo transactions found.")
+            return
+
+        filtered = transactions
+        if tx_type:
+            filtered = [tx for tx in filtered if tx["type"].lower() == tx_type.lower()]
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                filtered = [tx for tx in filtered if datetime.strptime(tx["timestamp"], "%Y-%m-%d %H:%M:%S") >= start_dt]
+            except ValueError:
+                print("Invalid start date format! Use YYYY-MM-DD")
+                return
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+                filtered = [tx for tx in filtered if datetime.strptime(tx["timestamp"], "%Y-%m-%d %H:%M:%S") <= end_dt]
+            except ValueError:
+                print("Invalid end date format! Use YYYY-MM-DD")
+                return
+
+        if not filtered:
+            print("\nNo transactions found for the given filters.")
+            return
+
+        print("\n=== Filtered Transaction History ===")
+        for idx, tx in enumerate(filtered, start=1):
+            print(f"{idx}. {tx['timestamp']} | {tx['type']} | Amount: {tx['amount']:.2f} INR | Balance After: {tx['balance_after']:.2f} INR")
+
+
+def main() -> None:
+    atm = ATM()
+
+    menu_options = {
+        "1": lambda: atm.check_balance() if atm._verify_pin() else None,
+        "2": lambda: atm.deposit() if atm._verify_pin() else None,
+        "3": lambda: atm.withdraw() if atm._verify_pin() else None,
+        "4": atm.change_pin,
+        "5": lambda: atm.view_transactions_prompt() if atm._verify_pin() else None,
+        "6": lambda: print("Thank you for using the ATM. Goodbye!")
+    }
+
+    def view_transactions_prompt() -> None:
+        print("\nFilter Transaction History (press enter to skip a filter):")
+        tx_type = input("Type (Deposit/Withdrawal): ").strip() or None
+        start_date = input("Start Date (YYYY-MM-DD): ").strip() or None
+        end_date = input("End Date (YYYY-MM-DD): ").strip() or None
+        atm.view_transactions(tx_type, start_date, end_date)
+
+    atm.view_transactions_prompt = view_transactions_prompt
+
     while True:
         print("\n=== ATM Menu ===")
         print("1. Check Balance")
         print("2. Deposit Money")
         print("3. Withdraw Money")
         print("4. Change PIN")
-        print("5. Exit")
-        choice = input("Enter your choice: ")
+        print("5. View Transaction History (Filtered)")
+        print("6. Exit")
 
-        if choice == "1":
-            if atm.check_pin():
-                atm.check_balance()
-        elif choice == "2":
-            if atm.check_pin():
-                atm.deposit()
-        elif choice == "3":
-            if atm.check_pin():
-                atm.withdraw()
-        elif choice == "4":
-            atm.change_pin()
-        elif choice == "5":
-            print("Thank you for using ATM. Goodbye!")
-            break
+        choice = input("Enter your choice: ").strip()
+        action = menu_options.get(choice)
+        if action:
+            action()
+            if choice == "6":
+                break
         else:
             print("Invalid choice! Please try again.")
+
 
 if __name__ == "__main__":
     main()
