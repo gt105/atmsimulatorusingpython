@@ -1,52 +1,98 @@
-class ATM:
-    def __init__(self, balance=0):
-        self.balance = balance
-        self.pin = "1234"
+import json
+from typing import Dict
 
-    def check_pin(self):
-        entered_pin = input("Enter your PIN: ")
+
+ATM_FILE = "atm_data.json"
+
+
+class ATM:
+    def __init__(self, data_file: str = ATM_FILE) -> None:
+        self.data_file = data_file
+        self.data: Dict[str, str | float] = self._load_data()
+
+        # Default values if file is empty
+        self.balance: float = float(self.data.get("balance", 10000.0))
+        self.pin: str = str(self.data.get("pin", "1234"))
+
+    def _load_data(self) -> Dict:
+        """Load ATM data from JSON file."""
+        try:
+            with open(self.data_file, "r") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def _save_data(self) -> None:
+        """Save ATM data to JSON file."""
+        self.data["balance"] = self.balance
+        self.data["pin"] = self.pin
+        with open(self.data_file, "w") as f:
+            json.dump(self.data, f, indent=4)
+
+    def _verify_pin(self) -> bool:
+        """Private method to verify user PIN."""
+        entered_pin = input("Enter your PIN: ").strip()
         if entered_pin == self.pin:
             return True
-        else:
-            print("Incorrect PIN!")
-            return False
+        print("Incorrect PIN!")
+        return False
 
-    def check_balance(self):
-        print(f"Your current balance is: {self.balance} INR")
+    def check_balance(self) -> None:
+        print(f"Your current balance is: {self.balance:.2f} INR")
 
-    def deposit(self):
-        amount = float(input("Enter amount to deposit: "))
-        if amount > 0:
-            self.balance += amount
-            print(f"Deposited {amount} INR successfully.")
-        else:
-            print("Invalid amount!")
-
-    def withdraw(self):
-        amount = float(input("Enter amount to withdraw: "))
-        if amount <= 0:
-            print("Invalid amount!")
-        elif amount > self.balance:
-            print("Insufficient balance!")
-        else:
-            self.balance -= amount
-            print(f"Withdrawn {amount} INR successfully.")
-
-    def change_pin(self):
-        old_pin = input("Enter current PIN: ")
-        if old_pin == self.pin:
-            new_pin = input("Enter new PIN: ")
-            confirm_pin = input("Confirm new PIN: ")
-            if new_pin == confirm_pin:
-                self.pin = new_pin
-                print("PIN changed successfully!")
+    def deposit(self) -> None:
+        try:
+            amount = float(input("Enter amount to deposit: ").strip())
+            if amount > 0:
+                self.balance += amount
+                self._save_data()
+                print(f"Deposited {amount:.2f} INR successfully.")
             else:
-                print("PIN confirmation does not match!")
-        else:
-            print("Incorrect current PIN!")
+                print("Amount must be greater than zero!")
+        except ValueError:
+            print("Invalid input! Please enter a numeric value.")
 
-def main():
-    atm = ATM(balance=10000)
+    def withdraw(self) -> None:
+        try:
+            amount = float(input("Enter amount to withdraw: ").strip())
+            if amount <= 0:
+                print("Amount must be greater than zero!")
+            elif amount > self.balance:
+                print("Insufficient balance!")
+            else:
+                self.balance -= amount
+                self._save_data()
+                print(f"Withdrawn {amount:.2f} INR successfully.")
+        except ValueError:
+            print("Invalid input! Please enter a numeric value.")
+
+    def change_pin(self) -> None:
+        old_pin = input("Enter current PIN: ").strip()
+        if old_pin != self.pin:
+            print("Incorrect current PIN!")
+            return
+
+        new_pin = input("Enter new PIN: ").strip()
+        confirm_pin = input("Confirm new PIN: ").strip()
+        if new_pin == confirm_pin:
+            self.pin = new_pin
+            self._save_data()
+            print("PIN changed successfully!")
+        else:
+            print("PIN confirmation does not match!")
+
+
+def main() -> None:
+    atm = ATM()
+
+    menu_options = {
+        "1": lambda: atm.check_balance() if atm._verify_pin() else None,
+        "2": lambda: atm.deposit() if atm._verify_pin() else None,
+        "3": lambda: atm.withdraw() if atm._verify_pin() else None,
+        "4": atm.change_pin,
+        "5": lambda: print("Thank you for using the ATM. Goodbye!")
+    }
+
     while True:
         print("\n=== ATM Menu ===")
         print("1. Check Balance")
@@ -54,24 +100,16 @@ def main():
         print("3. Withdraw Money")
         print("4. Change PIN")
         print("5. Exit")
-        choice = input("Enter your choice: ")
 
-        if choice == "1":
-            if atm.check_pin():
-                atm.check_balance()
-        elif choice == "2":
-            if atm.check_pin():
-                atm.deposit()
-        elif choice == "3":
-            if atm.check_pin():
-                atm.withdraw()
-        elif choice == "4":
-            atm.change_pin()
-        elif choice == "5":
-            print("Thank you for using ATM. Goodbye!")
-            break
+        choice = input("Enter your choice: ").strip()
+        action = menu_options.get(choice)
+        if action:
+            action()
+            if choice == "5":
+                break
         else:
             print("Invalid choice! Please try again.")
+
 
 if __name__ == "__main__":
     main()
