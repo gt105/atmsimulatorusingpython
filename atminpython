@@ -1,3 +1,36 @@
+
+import json
+from typing import Dict
+
+
+ATM_FILE = "atm_data.json"
+
+
+class ATM:
+    def __init__(self, data_file: str = ATM_FILE) -> None:
+        self.data_file = data_file
+        self.data: Dict[str, str | float] = self._load_data()
+
+        # Default values if file is empty
+        self.balance: float = float(self.data.get("balance", 10000.0))
+        self.pin: str = str(self.data.get("pin", "1234"))
+
+    def _load_data(self) -> Dict:
+        """Load ATM data from JSON file."""
+        try:
+            with open(self.data_file, "r") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def _save_data(self) -> None:
+        """Save ATM data to JSON file."""
+        self.data["balance"] = self.balance
+        self.data["pin"] = self.pin
+        with open(self.data_file, "w") as f:
+            json.dump(self.data, f, indent=4)
+
+=======
 from typing import Optional
 
 
@@ -5,6 +38,7 @@ class ATM:
     def __init__(self, balance: float = 0.0) -> None:
         self.balance: float = balance
         self.pin: str = "1234"
+
 
     def _verify_pin(self) -> bool:
         """Private method to verify user PIN."""
@@ -14,14 +48,23 @@ class ATM:
         print("Incorrect PIN!")
         return False
 
+
     def check_balance(self) -> None:
         print(f"Your current balance is: {self.balance:.2f} INR")
+
+=======
+
+    def check_balance(self) -> None:
+        print(f"Your current balance is: {self.balance:.2f} INR")
+
 
     def deposit(self) -> None:
         try:
             amount = float(input("Enter amount to deposit: ").strip())
             if amount > 0:
                 self.balance += amount
+
+                self._save_data()
                 print(f"Deposited {amount:.2f} INR successfully.")
             else:
                 print("Amount must be greater than zero!")
@@ -37,6 +80,24 @@ class ATM:
                 print("Insufficient balance!")
             else:
                 self.balance -= amount
+                self._save_data()
+=======
+                print(f"Deposited {amount:.2f} INR successfully.")
+            else:
+                print("Amount must be greater than zero!")
+        except ValueError:
+            print("Invalid input! Please enter a numeric value.")
+
+    def withdraw(self) -> None:
+        try:
+            amount = float(input("Enter amount to withdraw: ").strip())
+            if amount <= 0:
+                print("Amount must be greater than zero!")
+            elif amount > self.balance:
+                print("Insufficient balance!")
+            else:
+                self.balance -= amount
+
                 print(f"Withdrawn {amount:.2f} INR successfully.")
         except ValueError:
             print("Invalid input! Please enter a numeric value.")
@@ -51,13 +112,17 @@ class ATM:
         confirm_pin = input("Confirm new PIN: ").strip()
         if new_pin == confirm_pin:
             self.pin = new_pin
+
+            self._save_data()
+=======
+
             print("PIN changed successfully!")
         else:
             print("PIN confirmation does not match!")
 
 
 def main() -> None:
-    atm = ATM(balance=10000.0)
+
 
     menu_options = {
         "1": lambda: atm.check_balance() if atm._verify_pin() else None,
